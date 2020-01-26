@@ -56,14 +56,23 @@ public class TimezoneListViewActivity extends Activity implements TextWatcher {
      *
      */
     public void addTimezones() {
-        String[] locales = Locale.getISOCountries();
-        for (String countryCode : locales) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            String[] locales = Locale.getISOCountries();
+            for (String countryCode : locales) {
                 for (String id : android.icu.util.TimeZone.getAvailableIDs(countryCode)) {
                     final String zone = displayTimeZone(TimeZone.getTimeZone(id));
                     if (!zone.equalsIgnoreCase("GMT (GMT0:00)")) {
                         // Add timezone to result map
                         timezone_names.add(new ZoneName(zone, countryCode));
+                    }
+                }
+            }
+        } else {
+            for (String id : java.util.TimeZone.getAvailableIDs()) {
+                final String zone = displayTimeZone(TimeZone.getTimeZone(id));
+                if (!zone.equalsIgnoreCase("GMT (GMT0:00)")) {
+                    // Add timezone to result map
+                    timezone_names.add(new ZoneName(zone, id));
                     }
                 }
 
@@ -74,6 +83,7 @@ public class TimezoneListViewActivity extends Activity implements TextWatcher {
                 break;
             }
         }
+
 
         Collections.sort(timezone_names, (n1, n2) -> n1.shortName.compareTo(n2.shortName));
 

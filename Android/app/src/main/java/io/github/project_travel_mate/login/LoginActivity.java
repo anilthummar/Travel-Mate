@@ -11,6 +11,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.preference.PreferenceManager;
 import android.support.design.widget.Snackbar;
+import android.support.design.widget.TextInputLayout;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Patterns;
@@ -27,13 +28,13 @@ import com.mukesh.OnOtpCompletionListener;
 import com.mukesh.OtpView;
 
 import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import butterknife.BindView;
 import butterknife.ButterKnife;
 import io.github.project_travel_mate.MainActivity;
 import io.github.project_travel_mate.R;
 import utils.TravelmateSnackbars;
+import utils.Utils;
 
 import static utils.Constants.USER_EMAIL;
 import static utils.Constants.USER_TOKEN;
@@ -103,6 +104,13 @@ public class LoginActivity extends AppCompatActivity implements View.OnClickList
     @BindView(R.id.reset_code)
     OtpView mResetCode;
 
+    @BindView(R.id.input_layout_email_forgot_password)
+    TextInputLayout mInputLayoutEmailForgotPassword;
+    @BindView(R.id.input_layout_firstname_signup)
+    TextInputLayout mInputLayoutFirstNameSignup;
+    @BindView(R.id.input_layout_lastname_signup)
+    TextInputLayout mInputLayoutLastNameSignup;
+
     private SharedPreferences mSharedPreferences;
     private MaterialDialog mDialog;
     private Handler mHandler;
@@ -169,13 +177,17 @@ public class LoginActivity extends AppCompatActivity implements View.OnClickList
                 mForgotPasswordText.setVisibility(View.VISIBLE);
                 mBackToLogin.setVisibility(View.GONE);
                 login.setVisibility(View.GONE);
-                mLoginPresenter.login();
+                mLoginPresenter.login(false);
                 break;
             // Call login
             case R.id.ok_login:
                 String emailString = email_login.getText().toString();
                 String passString = pass_login.getText().toString();
-                mLoginPresenter.ok_login(emailString, passString, mHandler);
+                if (Utils.isNetworkConnected(this)) {
+                    mLoginPresenter.ok_login(emailString, passString, mHandler);
+                } else {
+                    showNoNetwork();
+                }
                 break;
             // Call signup
             case R.id.ok_signup:
@@ -184,16 +196,27 @@ public class LoginActivity extends AppCompatActivity implements View.OnClickList
                 String confirmPassString = confirm_pass_signup.getText().toString();
                 String firstname = firstName.getText().toString();
                 String lastname = lastName.getText().toString();
-                if (validateEmail(emailString)) {
-                    if (validatePassword(passString)) {
-                        if (passString.equals(confirmPassString)) {
-                            mLoginPresenter.ok_signUp(firstname, lastname, emailString, passString, mHandler);
-                        } else {
-                            Snackbar snackbar = Snackbar
-                                    .make(findViewById(android.R.id.content),
-                                          R.string.passwords_check, Snackbar.LENGTH_LONG);
-                            snackbar.show();
+                if (validateName(firstname, lastname)) {
+                    if (validateEmail(emailString)) {
+                        if (validatePassword(passString)) {
+                            if (passString.equals(confirmPassString)) {
+                                if (Utils.isNetworkConnected(this)) {
+                                    mLoginPresenter.ok_signUp(firstname, lastname, emailString, passString, mHandler);
+                                } else {
+                                    showNoNetwork();
+                                }
+                            } else {
+                                Snackbar snackbar = Snackbar
+                                        .make(findViewById(android.R.id.content),
+                                                R.string.passwords_check, Snackbar.LENGTH_LONG);
+                                snackbar.show();
+                            }
                         }
+                    } else {
+                        Snackbar snackbar = Snackbar
+                                .make(findViewById(android.R.id.content),
+                                        R.string.email_valid_check, Snackbar.LENGTH_LONG);
+                        snackbar.show();
                     }
                 }
                 break;
@@ -219,7 +242,7 @@ public class LoginActivity extends AppCompatActivity implements View.OnClickList
                 mForgotPasswordText.setVisibility(View.VISIBLE);
                 mBackToLogin.setVisibility(View.GONE);
                 login.setVisibility(View.GONE);
-                mLoginPresenter.login();
+                mLoginPresenter.login(false);
                 break;
                 // Call resend reset code request
             case R.id.resend_code:
@@ -253,6 +276,12 @@ public class LoginActivity extends AppCompatActivity implements View.OnClickList
     public void showError() {
         TravelmateSnackbars.createSnackBar(findViewById(R.id.login_activity),
                 R.string.toast_invalid_username_or_password, Snackbar.LENGTH_LONG).show();
+    }
+
+    @Override
+    public void showNoNetwork() {
+        TravelmateSnackbars.createSnackBar(findViewById(R.id.login_activity),
+                R.string.toast_no_internet_detected, Snackbar.LENGTH_LONG).show();
     }
 
     @Override
@@ -303,8 +332,10 @@ public class LoginActivity extends AppCompatActivity implements View.OnClickList
     }
 
     @Override
-    public void openLogin() {
-        showMessage(getString(R.string.text_password_updated_alert));
+    public void openLogin(boolean showToastMessage) {
+        if (showToastMessage) {
+            showMessage(getString(R.string.text_password_updated_alert));
+        }
         mForgotPasswordLayout.setVisibility(View.GONE);
         mNewPasswordLayout.setVisibility(View.GONE);
         sig.setVisibility(View.GONE);
@@ -386,11 +417,32 @@ public class LoginActivity extends AppCompatActivity implements View.OnClickList
     public boolean validateEmail(String email) {
         Matcher matcher = Patterns.EMAIL_ADDRESS.matcher(email);
         if (!email.equals("") && matcher.matches()) {
+            mInputLayoutEmailForgotPassword.setErrorEnabled(false);
             return true;
         } else {
-            Snackbar snackbar = Snackbar
-                    .make(findViewById(android.R.id.content), R.string.invalid_email, Snackbar.LENGTH_LONG);
-            snackbar.show();
+            mInputLayoutEmailForgotPassword.setError(getString(R.string.invalid_email));
+            return false;
+        }
+    }
+
+    /**
+     * Validates first name and last name of user, checks if these are empty or filled
+     * @param firstname first name of user
+     * @param lastname last name of user
+     * @return Boolean returns true if both are filled, otherwise false
+     */
+    public boolean validateName(String firstname, String lastname) {
+        if (!firstname.isEmpty() && !lastname.isEmpty())
+            return true;
+        else {
+            if (firstname.isEmpty())
+                mInputLayoutFirstNameSignup.setError(getString(R.string.empty_first_name));
+            else
+                mInputLayoutFirstNameSignup.setErrorEnabled(false);
+            if (lastname.isEmpty())
+                mInputLayoutLastNameSignup.setError(getString(R.string.empty_last_name));
+            else
+                mInputLayoutLastNameSignup.setErrorEnabled(false);
             return false;
         }
     }
@@ -402,20 +454,7 @@ public class LoginActivity extends AppCompatActivity implements View.OnClickList
      */
     public boolean validatePassword(String passString) {
         if (passString.length() >= 8) {
-            Pattern pattern;
-            Matcher matcher;
-            final String PASSWORD_PATTERN = "^(?=.*[0-9])(?=.*[A-Z])(?=.*[_@#$%^?&+=!])(?=\\S+$).{4,}$";
-            pattern = Pattern.compile(PASSWORD_PATTERN);
-            matcher = pattern.matcher(passString);
-
-            if (matcher.matches()) {
-                return true;
-            } else {
-                Snackbar snackbar = Snackbar
-                        .make(findViewById(android.R.id.content), R.string.invalid_password, Snackbar.LENGTH_LONG);
-                snackbar.show();
-                return false;
-            }
+            return true;              
         } else {
             Snackbar snackbar = Snackbar
                     .make(findViewById(android.R.id.content), R.string.password_length, Snackbar.LENGTH_LONG);
@@ -437,4 +476,5 @@ public class LoginActivity extends AppCompatActivity implements View.OnClickList
         mOtpCode = otp;
         mLoginPresenter.newPasswordInput();
     }
+
 }

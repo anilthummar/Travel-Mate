@@ -42,6 +42,7 @@ import okhttp3.Response;
 import utils.TravelmateSnackbars;
 
 import static android.app.Activity.RESULT_OK;
+import static android.content.Intent.FLAG_ACTIVITY_NEW_TASK;
 import static utils.Constants.API_LINK_V2;
 import static utils.Constants.USER_TOKEN;
 
@@ -89,7 +90,8 @@ public class MyTripsFragment extends Fragment implements SwipeRefreshLayout.OnRe
         mMyTripsAdapter.setOnItemClickListener((trip) -> {
             Intent intent = MyTripInfoActivity.getStartIntent(mActivity.getApplicationContext(),
                     trip);
-            mActivity.getApplicationContext().startActivity(intent);
+            intent.setFlags(FLAG_ACTIVITY_NEW_TASK);
+            startActivity(intent);
         });
         mRecyclerView.setAdapter(mMyTripsAdapter);
         mytrip();
@@ -193,8 +195,10 @@ public class MyTripsFragment extends Fragment implements SwipeRefreshLayout.OnRe
      * Plays the no results animation in the view
      */
     private void noResults() {
+        ArrayList<Trip> trips = new ArrayList<>();
+        mMyTripsAdapter.initData(trips);
         TravelmateSnackbars.createSnackBar(mTripsView.findViewById(R.id.my_trips_frag), R.string.no_trips,
-                Snackbar.LENGTH_LONG).show();
+                Snackbar.LENGTH_SHORT).show();
         animationView.setAnimation(R.raw.empty_list);
         animationView.setVisibility(View.VISIBLE);
         animationView.playAnimation();
